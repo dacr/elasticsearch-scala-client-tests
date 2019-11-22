@@ -1,0 +1,1 @@
+# elasticsearch-scala-client-tests
