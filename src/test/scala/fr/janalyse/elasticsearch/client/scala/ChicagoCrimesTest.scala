@@ -60,6 +60,7 @@ class ChicagoCrimesTest extends ElasticClientTestsHelper {
       val rawresults = Extraction.decompose(response.result.aggregations.data.get("primaryTypesAgg"))
       val buckets = (rawresults \ "buckets").extract[Array[Bucket]]
       val results = buckets.map(bucket => bucket.key -> bucket.doc_count).toMap
+      results.size shouldBe 35
       results.get("NARCOTICS").value shouldBe 724752
     }
     /*
