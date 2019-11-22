@@ -1,6 +1,11 @@
 package fr.janalyse.elasticsearch.client.scala
 
 import com.sksamuel.elastic4s.ElasticDsl._
+import com.sksamuel.elastic4s.requests.searches.TermsAggResult
+import org.json4s.Extraction
+import org.json4s.JsonAST.JValue
+import org.json4s.JsonDSL._
+import org.scalatest.OptionValues._
 
 class ChicagoCrimesTest extends ElasticClientTestsHelper {
 
@@ -42,6 +47,9 @@ class ChicagoCrimesTest extends ElasticClientTestsHelper {
 
 
   // ----------------------------------------------------------------------
+
+  case class Bucket(key:String, doc_count:Int)
+
   it should "be possible to count how many crimes for each primary type" in {
     val responseResult = client.execute {
       search("crimes").matchAllQuery().aggs {
@@ -49,13 +57,18 @@ class ChicagoCrimesTest extends ElasticClientTestsHelper {
       }
     }
     responseResult.map{response=>
-      val rawresults = response.result.aggregations.data
-      println(rawresults)
-      rawresults.collect{case (primaryType,count:Long) => primaryType->count}
-    }.map{results =>
-      results.size shouldBe 35
-      results.get("NARCOTICS") shouldBe > (0)
+      val rawresults = Extraction.decompose(response.result.aggregations.data.get("primaryTypesAgg"))
+      val buckets = (rawresults \ "buckets").extract[Array[Bucket]]
+      val results = buckets.map(bucket => bucket.key -> bucket.doc_count).toMap
+      results.get("NARCOTICS").value shouldBe 724752
     }
+    /*
+    responseResult.map{response=>
+      val termsAggResult = Extraction.decompose(response.result.aggregations).extract[TermsAggResult]
+      val results = termsAggResult.buckets.map(b => b.key->b.docCount).toMap
+      results.get("NARCOTICS").value shouldBe 724752
+    }
+    */
   }
 
 }
