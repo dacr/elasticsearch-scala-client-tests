@@ -14,7 +14,10 @@ class ChicagoCrimesTest extends ElasticClientTestsHelper {
     val countFuture = client.execute {
       count("crimes")
     }.map(_.result.count)
-    countFuture.map{ count => count should be > 6000000L}
+    countFuture.map{ count =>
+      info("Found "+count)
+      count shouldBe 7000000L +- 100000L
+    }
   }
 
   // ----------------------------------------------------------------------
@@ -29,7 +32,8 @@ class ChicagoCrimesTest extends ElasticClientTestsHelper {
         }
     }
     responseFuture.map{response =>
-      response.result.hits.total.value should be > 0L
+      info("Found "+response.result.hits.total.value)
+      response.result.hits.total.value shouldBe 5000L +- 1000L
     }
   }
 
