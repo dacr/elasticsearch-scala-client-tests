@@ -65,7 +65,7 @@ class ChicagoCrimesTest extends ElasticClientTestsHelper {
       val buckets = (rawresults \ "buckets").extract[Array[Bucket]]
       val results = buckets.map(bucket => bucket.key -> bucket.doc_count).toMap
       results.size shouldBe 35
-      results.get("NARCOTICS").value shouldBe 724752
+      results.get("NARCOTICS").value shouldBe 724752 +- 2000
     }
     /*
     responseResult.map{response=>
