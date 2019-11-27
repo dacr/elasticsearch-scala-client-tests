@@ -4,7 +4,7 @@ import java.time.{Instant, OffsetDateTime, ZoneOffset}
 
 import com.sksamuel.elastic4s.ElasticDsl._
 import com.sksamuel.elastic4s.json4s.ElasticJson4s.Implicits._
-import com.sksamuel.elastic4s.requests.searches.AvgAggResult
+import com.sksamuel.elastic4s.requests.searches.{Aggregations, AvgAggResult}
 import org.json4s.JValue
 import org.scalatest.OptionValues._
 
@@ -15,13 +15,13 @@ import scala.util.Random.{nextDouble, nextInt, nextLong}
 
 case class Address(town: String, country: String)
 
-case class Someone(name: String, size: Double, birthDate: OffsetDateTime, address: Address)
+case class Someone(name: String, size: Double, gender:String, birthDate: OffsetDateTime, address: Address)
 
 class SerDesTest extends ElasticClientTestsHelper {
 
   def generateSomeone(): Someone = {
-    val firstNames = List("sarah", "joe", "john")
-    val firstName = firstNames(nextInt(firstNames.size))
+    val firstNames = List("sarah"->"female", "joe"->"male", "john"->"male", "lucie"->"female")
+    val (firstName, gender) = firstNames(nextInt(firstNames.size))
     val lastName = "doe" + nextInt(1000)
     val name = s"$firstName $lastName"
     val size = 1.2d + nextDouble() * 2 / 3
@@ -30,7 +30,7 @@ class SerDesTest extends ElasticClientTestsHelper {
       "abidjan" -> "cote d'ivoire", "boston" -> "us", "berlin"->"allemagne")
     val (town, country) = choices(nextInt(choices.size))
     val birthDate = Instant.ofEpochSecond(System.currentTimeMillis()/1000L - nextLong(60L*60*24*365*80))
-    Someone(name, size, birthDate.atOffset(ZoneOffset.of("+01")), Address(town,country))
+    Someone(name, size, gender, birthDate.atOffset(ZoneOffset.of("+01")), Address(town,country))
   }
 
   "someone generator" should "be able to create a good human" in {
@@ -45,7 +45,7 @@ class SerDesTest extends ElasticClientTestsHelper {
   "elasticsearch client application" should "to insert a case class" in {
     val birthDate = OffsetDateTime.parse("2010-01-01T01:02:03Z")
     val address = Address("chicago", "us")
-    val joe = Someone("joe", size = 1.85d, birthDate = birthDate, address = address)
+    val joe = Someone("joe", size = 1.85d, "male", birthDate = birthDate, address = address)
 
     client.execute {
       indexInto("serdes").doc(joe).refreshImmediately
@@ -124,13 +124,39 @@ class SerDesTest extends ElasticClientTestsHelper {
       search("serdes")
         .query{ queryStringQuery("joe") }
         .aggs {
-          avgAgg("average", "size")
+          avgAgg("peopleAverageSize", "size")
         }
     }.map { response =>
-      //val result = response.result.aggregations.to[AvgAggResult]
-      //result.value shouldBe 1.5d +- 0.5
-      val result = response.result.aggregations.to[JValue]
-      (result \\ "value").extract[Double] shouldBe 1.5d +- 0.5
+      //val result = response.result.aggregations.to[JValue]
+      //(result \\ "value").extract[Double] shouldBe 1.5d +- 0.5
+      val result = response.result.aggs.avg("peopleAverageSize")
+      result.value shouldBe 1.5d +- 0.5
+    }
+  }
+
+  it should "be possible to compute people average size by gender" in {
+    client.execute{
+      search("serdes")
+        .query{matchAllQuery() }
+        .aggs {
+          termsAgg("res1", "gender.keyword")
+            .subaggs(avgAgg("res2", "size"))
+        }
+    }.map { response =>
+      val buckets =
+        response
+          .result
+          .aggregations
+          .terms("res1")
+          .buckets
+      buckets.size shouldBe 2
+
+      buckets(0).key  should  (be("male") or be("female"))
+      buckets(0).avgBucket("res2").value  shouldBe 1.5d +- 0.5
+
+      buckets(1).key  should  (be("male") or be("female"))
+      buckets(1).avgBucket("res2").value  shouldBe 1.5d +- 0.5
+      //Aggregations(buckets(0)).avg("res2") shouldBe 1.5d +- 0.5
     }
   }
 
