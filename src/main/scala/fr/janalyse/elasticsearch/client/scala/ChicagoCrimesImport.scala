@@ -125,38 +125,45 @@ object ChicagoCrimesImport extends ElasticClientHelper {
       foundLocation.map(location => "location" -> location)
   }
 
-  type WriteStatus = Response[BulkResponse]
-  type WriteStatuses = List[WriteStatus]
+  case class BulksStatus(successes:Int, failures:Int)
   def fill() {
     val linesIterator = scala.io.Source.fromFile("crimes.csv").getLines
     val headers = normalizeHeaders(linesIterator.next.split("""\s*,\s*""").toList)
 
 
-    def writeDataPar(indexName: String): Future[WriteStatuses] = {
+    def writeDataPar(indexName: String): Future[BulksStatus] = {
       logger.info(s"writeData($indexName)")
-      def write(iterator: linesIterator.GroupedIterator[String], responses: WriteStatuses=Nil):Future[WriteStatuses] = {
+      def write(iterator: linesIterator.GroupedIterator[String], status: BulksStatus=BulksStatus(0,0)):Future[BulksStatus] = {
         if (iterator.hasNext) {
           val groupsParallelProcessingFutures = iterator.take(25).map { group =>
             insertBulk(indexName, group.map(lineToDocument(headers)))
           }
           val groupsParallelProcessingFuture = Future.sequence(groupsParallelProcessingFutures)
           groupsParallelProcessingFuture.flatMap{ groupsResponses =>
-            write(iterator, groupsResponses.toList:::responses)
+            val successes = groupsResponses.filter(_.isSuccess).size
+            val failures = groupsResponses.size - successes
+            val nextStatus = BulksStatus(status.successes + successes,status.failures+failures)
+            write(iterator,nextStatus)
           }
-        } else Future.successful(responses)
+        } else Future.successful(status)
       }
-      write(linesIterator.grouped(1000)) // TODO - check all results responses
+      write(linesIterator.grouped(1000)) // TODO - check all results status
     }
 
-    def writeDataSeq(indexName: String): Future[WriteStatuses] = {
+    def writeDataSeq(indexName: String): Future[BulksStatus] = {
       logger.info(s"writeData($indexName)")
-      def write(iterator: linesIterator.GroupedIterator[String], responses: WriteStatuses=Nil):Future[WriteStatuses] = {
+      def write(iterator: linesIterator.GroupedIterator[String], status: BulksStatus=BulksStatus(0,0)):Future[BulksStatus] = {
         if (iterator.hasNext) {
           insertBulk(indexName, iterator.next.map(lineToDocument(headers)))
-              .flatMap { response => write(iterator, response::responses)}
-        } else Future.successful(responses)
+              .flatMap { response =>
+                val nextStatus =
+                  if (response.isSuccess) BulksStatus(status.successes + 1,status.failures)
+                  else BulksStatus(status.successes,status.failures+1)
+                write(iterator, nextStatus)
+              }
+        } else Future.successful(status)
       }
-      write(linesIterator.grouped(1000)) // TODO - check all results responses
+      write(linesIterator.grouped(5000)) // TODO - check all results status
     }
 
     val startedAt = now()
