@@ -131,6 +131,7 @@ object ChicagoCrimesImport extends ElasticClientHelper {
     val headers = normalizeHeaders(linesIterator.next.split("""\s*,\s*""").toList)
 
 
+    // quite faster but can be improved because of the "rendez-vous" effect
     def writeDataPar(indexName: String): Future[BulksStatus] = {
       logger.info(s"writeData($indexName)")
       def write(iterator: linesIterator.GroupedIterator[String], status: BulksStatus=BulksStatus(0,0)):Future[BulksStatus] = {
@@ -150,6 +151,7 @@ object ChicagoCrimesImport extends ElasticClientHelper {
       write(linesIterator.grouped(1000)) // TODO - check all results status
     }
 
+    // Slow
     def writeDataSeq(indexName: String): Future[BulksStatus] = {
       logger.info(s"writeData($indexName)")
       def write(iterator: linesIterator.GroupedIterator[String], status: BulksStatus=BulksStatus(0,0)):Future[BulksStatus] = {
