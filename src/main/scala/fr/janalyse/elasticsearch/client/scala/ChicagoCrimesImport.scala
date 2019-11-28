@@ -131,7 +131,24 @@ object ChicagoCrimesImport extends ElasticClientHelper {
     val linesIterator = scala.io.Source.fromFile("crimes.csv").getLines
     val headers = normalizeHeaders(linesIterator.next.split("""\s*,\s*""").toList)
 
-    def writeData(indexName: String): Future[WriteStatuses] = {
+
+    def writeDataPar(indexName: String): Future[WriteStatuses] = {
+      logger.info(s"writeData($indexName)")
+      def write(iterator: linesIterator.GroupedIterator[String], responses: WriteStatuses=Nil):Future[WriteStatuses] = {
+        if (iterator.hasNext) {
+          val groupsParallelProcessingFutures = iterator.take(25).map { group =>
+            insertBulk(indexName, group.map(lineToDocument(headers)))
+          }
+          val groupsParallelProcessingFuture = Future.sequence(groupsParallelProcessingFutures)
+          groupsParallelProcessingFuture.flatMap{ groupsResponses =>
+            write(iterator, groupsResponses.toList:::responses)
+          }
+        } else Future.successful(responses)
+      }
+      write(linesIterator.grouped(1000)) // TODO - check all results responses
+    }
+
+    def writeDataSeq(indexName: String): Future[WriteStatuses] = {
       logger.info(s"writeData($indexName)")
       def write(iterator: linesIterator.GroupedIterator[String], responses: WriteStatuses=Nil):Future[WriteStatuses] = {
         if (iterator.hasNext) {
@@ -139,11 +156,8 @@ object ChicagoCrimesImport extends ElasticClientHelper {
               .flatMap { response => write(iterator, response::responses)}
         } else Future.successful(responses)
       }
-      def it: linesIterator.GroupedIterator[String] =
-        linesIterator.grouped(1000) // .take(500) // for test purposes, when you want to limit inputs
-      write(it) // TODO - check all results responses
+      write(linesIterator.grouped(1000)) // TODO - check all results responses
     }
-
 
     val startedAt = now()
 
@@ -151,7 +165,8 @@ object ChicagoCrimesImport extends ElasticClientHelper {
       cleaned <- doClean(indexName) // delete any existing indexName
       created <- doCreateTestIndex(indexName) // create the indexName, required for geoloc type mapping
       refreshDisabledResponse <- doLoadingOptimizationsStart(indexName) // To accelerate insertion
-      responses <- writeData(indexName) // bulk operation insert all events
+      //responses <- writeDataSeq(indexName) // bulk operation insert all events
+      responses <- writeDataPar(indexName) // bulk operation insert all events
       refreshEnabledResponse <- doLoadingOptimizationEnd(indexName) // revert back to a normal behavior
       refreshed <- doRefreshIndex(indexName) // to wait for every to be available for search...
       count <- doCount(indexName)
