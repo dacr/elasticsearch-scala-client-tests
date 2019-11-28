@@ -135,7 +135,7 @@ object ChicagoCrimesImport extends ElasticClientHelper {
       logger.info(s"writeData($indexName)")
       def write(iterator: linesIterator.GroupedIterator[String], status: BulksStatus=BulksStatus(0,0)):Future[BulksStatus] = {
         if (iterator.hasNext) {
-          val groupsParallelProcessingFutures = iterator.take(25).map { group =>
+          val groupsParallelProcessingFutures = iterator.take(20).map { group =>
             insertBulk(indexName, group.map(lineToDocument(headers)))
           }
           val groupsParallelProcessingFuture = Future.sequence(groupsParallelProcessingFutures)
@@ -163,7 +163,7 @@ object ChicagoCrimesImport extends ElasticClientHelper {
               }
         } else Future.successful(status)
       }
-      write(linesIterator.grouped(5000)) // TODO - check all results status
+      write(linesIterator.grouped(1000)) // TODO - check all results status
     }
 
     val startedAt = now()
