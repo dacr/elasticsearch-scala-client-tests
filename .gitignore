@@ -92,3 +92,6 @@ jrebel.lic
 # paulp script
 /.lib/
 
+# my resources
+*.csv
+

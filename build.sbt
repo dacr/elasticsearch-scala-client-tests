@@ -12,5 +12,7 @@ libraryDependencies ++= Seq(
   "org.json4s"              %% "json4s-ext"                    % "3.6.7",
 
   "org.scalatest"           %% "scalatest"                     % "3.0.8",
+
+  "fr.janalyse"             %% "split"                         % "0.3.12",
 )
 
