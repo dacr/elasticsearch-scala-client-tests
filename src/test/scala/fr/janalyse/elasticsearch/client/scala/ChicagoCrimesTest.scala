@@ -2,6 +2,7 @@ package fr.janalyse.elasticsearch.client.scala
 
 import com.sksamuel.elastic4s.ElasticDsl._
 import com.sksamuel.elastic4s.requests.searches.TermsAggResult
+import fr.janalyse.elasticsearch.client.scala.helpers.ElasticClientTestsHelper
 import org.json4s.Extraction
 import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
