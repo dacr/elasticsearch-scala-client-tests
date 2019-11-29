@@ -9,7 +9,7 @@ import org.json4s.ext.JavaTimeSerializers
 import org.json4s.{DefaultFormats, native}
 import org.scalatest.{AsyncFlatSpec, BeforeAndAfterAll, Matchers}
 
-abstract class ElasticClientDynamicProvisionningTestsHelper extends AsyncFlatSpec with Matchers with BeforeAndAfterAll {
+abstract class ElasticClientDynamicProvisionedTestsHelper extends AsyncFlatSpec with Matchers with BeforeAndAfterAll {
   implicit val serialization = native.Serialization
   implicit val formats = DefaultFormats.lossless ++ JavaTimeSerializers.all
 

@@ -8,10 +8,27 @@ import com.sksamuel.elastic4s.requests.mappings.FieldType._
 import java.time.{Instant, ZoneId}
 import java.time.format.DateTimeFormatter
 
+import com.sksamuel.elastic4s.http.JavaClient
+import com.sksamuel.elastic4s.{ElasticClient, ElasticProperties}
+import org.json4s.ext.JavaTimeSerializers
+import org.json4s.{DefaultFormats, native}
 import org.slf4j.LoggerFactory
-import scala.concurrent._
 
-object ChicagoCrimesImport extends ElasticClientHelper {
+import scala.concurrent._
+import scala.util.{Failure, Success}
+
+object ChicagoCrimesImport {
+ def apply():ChicagoCrimesImport =
+   new ChicagoCrimesImport(s"http://127.0.0.1:9201")
+
+  def main(args: Array[String]): Unit = {
+    val response = ChicagoCrimesImport().importCSV()
+    //Await.result(futureResponse, 30.minutes) // because we don't want to exit the script before the future has completed
+  }
+}
+
+
+class ChicagoCrimesImport(elasticPropertiesDesc:String) {
   val logger = LoggerFactory.getLogger(getClass())
 
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -19,7 +36,10 @@ object ChicagoCrimesImport extends ElasticClientHelper {
   val indexName = "crimes"
   val mappingName = "testmapping"
 
-  val client = getElasticClient()
+  val client = ElasticClient(JavaClient(ElasticProperties(elasticPropertiesDesc)))
+  implicit val serialization = native.Serialization
+  implicit val formats = DefaultFormats.lossless ++ JavaTimeSerializers.all
+
 
   def now() = System.currentTimeMillis()
 
@@ -68,7 +88,6 @@ object ChicagoCrimesImport extends ElasticClientHelper {
     logger.info(s"doCount($name)")
     client.execute { count(name) }
   }
-
   def insertBulk(name: String, entries: Seq[Map[String, String]]) = client.execute {
     print("*")
     bulk {
@@ -114,8 +133,14 @@ object ChicagoCrimesImport extends ElasticClientHelper {
   }
 
   case class BulksStatus(successes:Int, failures:Int)
-  def fill() {
-    val linesIterator = scala.io.Source.fromFile("crimes.csv").getLines
+
+  def importCSV(limitOption:Option[Int]=None) = {
+    val linesIterator = limitOption match {
+      case None =>
+        scala.io.Source.fromFile("crimes.csv").getLines
+      case Some(limit) =>
+        scala.io.Source.fromFile("crimes.csv").getLines.take(limit+1) // +1 because of the header line
+    }
     val headers = normalizeHeaders(linesIterator.next.split("""\s*,\s*""").toList)
 
     // quite faster but can be improved because of the "rendez-vous" effect
@@ -169,17 +194,16 @@ object ChicagoCrimesImport extends ElasticClientHelper {
       count <- doCount(indexName)
     } yield {
       println(response) // bulks operation status
-      count
+      count.result.count
     }
 
-    futureResponse map { countResponse =>
-      val duration = (now() - startedAt) / 1000
-      println(s"$countResponse documents inserted in $duration seconds")
+    futureResponse.andThen {
+      case Success(count) =>
+        val duration = (now() - startedAt) / 1000
+        logger.info(s"$count documents inserted in $duration seconds")
+      case Failure(ex) =>
+        logger.error("Something wrong has happened", ex)
     }
   }
 
-  def main(args: Array[String]): Unit = {
-    val response = fill()
-    //Await.result(futureResponse, 30.minutes) // because we don't want to exit the script before the future has completed
-  }
 }

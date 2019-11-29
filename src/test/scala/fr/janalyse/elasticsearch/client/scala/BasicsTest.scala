@@ -2,10 +2,10 @@ package fr.janalyse.elasticsearch.client.scala
 
 import com.sksamuel.elastic4s.ElasticDsl._
 import com.sksamuel.elastic4s.json4s.ElasticJson4s.Implicits._
-import fr.janalyse.elasticsearch.client.scala.helpers.ElasticClientDynamicProvisionningTestsHelper
+import fr.janalyse.elasticsearch.client.scala.helpers.ElasticClientDynamicProvisionedTestsHelper
 
 
-class BasicsTest extends ElasticClientDynamicProvisionningTestsHelper {
+class BasicsTest extends ElasticClientDynamicProvisionedTestsHelper {
   // ----------------------------------------------------------------------
   "elasticsearch client application" should "be able to get cluster state information" in {
     client.execute {

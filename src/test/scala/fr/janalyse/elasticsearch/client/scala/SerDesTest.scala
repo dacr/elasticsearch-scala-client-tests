@@ -5,7 +5,7 @@ import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import com.sksamuel.elastic4s.ElasticDsl._
 import com.sksamuel.elastic4s.json4s.ElasticJson4s.Implicits._
 import com.sksamuel.elastic4s.requests.searches.{Aggregations, AvgAggResult}
-import fr.janalyse.elasticsearch.client.scala.helpers.ElasticClientDynamicProvisionningTestsHelper
+import fr.janalyse.elasticsearch.client.scala.helpers.ElasticClientDynamicProvisionedTestsHelper
 import org.json4s.JValue
 import org.scalatest.OptionValues._
 
@@ -18,7 +18,7 @@ case class Address(town: String, country: String)
 
 case class Someone(name: String, size: Double, gender:String, birthDate: OffsetDateTime, address: Address)
 
-class SerDesTest extends ElasticClientDynamicProvisionningTestsHelper {
+class SerDesTest extends ElasticClientDynamicProvisionedTestsHelper {
 
   def generateSomeone(): Someone = {
     val firstNames = List("sarah"->"female", "joe"->"male", "john"->"male", "lucie"->"female")
