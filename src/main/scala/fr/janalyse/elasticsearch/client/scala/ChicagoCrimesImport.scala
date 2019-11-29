@@ -1,25 +1,15 @@
 package fr.janalyse.elasticsearch.client.scala
 
 import fr.janalyse.split.CsvSplit.split
-import com.sksamuel.elastic4s.{ElasticClient, ElasticProperties, Response}
-import com.sksamuel.elastic4s.http.JavaClient
 import com.sksamuel.elastic4s.ElasticDsl.{count, _}
 import com.sksamuel.elastic4s.json4s.ElasticJson4s.Implicits._
 import com.sksamuel.elastic4s.requests.mappings._
 import com.sksamuel.elastic4s.requests.mappings.FieldType._
-import org.json4s.{DefaultFormats, native}
-import org.json4s.ext.JavaTimeSerializers
-import java.time.{Instant, OffsetDateTime, ZoneId}
+import java.time.{Instant, ZoneId}
 import java.time.format.DateTimeFormatter
 
-import com.sksamuel.elastic4s.requests.bulk.BulkResponse
-import org.apache.http.client.config.RequestConfig
-import org.apache.http.impl.nio.client.HttpAsyncClientBuilder
-import org.slf4j.{Logger, LoggerFactory}
-
+import org.slf4j.LoggerFactory
 import scala.concurrent._
-import scala.concurrent.duration._
-import annotation.tailrec
 
 object ChicagoCrimesImport extends ElasticClientHelper {
   val logger = LoggerFactory.getLogger(getClass())
@@ -29,7 +19,6 @@ object ChicagoCrimesImport extends ElasticClientHelper {
   val indexName = "crimes"
   val mappingName = "testmapping"
 
-  // Customize the default configuration, we're going to insert a huge amount of data in a unclean but fast way
   val client = getElasticClient()
 
   def now() = System.currentTimeMillis()
@@ -89,7 +78,6 @@ object ChicagoCrimesImport extends ElasticClientHelper {
     }
   }
 
-
   val dateFormat = DateTimeFormatter.ofPattern("MM/d/yyyy hh:mm:ss a").withZone(ZoneId.of("America/Chicago"))
 
   def normalizeDate(date: String): String = {
@@ -130,13 +118,13 @@ object ChicagoCrimesImport extends ElasticClientHelper {
     val linesIterator = scala.io.Source.fromFile("crimes.csv").getLines
     val headers = normalizeHeaders(linesIterator.next.split("""\s*,\s*""").toList)
 
-
     // quite faster but can be improved because of the "rendez-vous" effect
     def writeDataPar(indexName: String): Future[BulksStatus] = {
       logger.info(s"writeData($indexName)")
+      // TODO take care, recursive and not tail rec
       def write(iterator: linesIterator.GroupedIterator[String], status: BulksStatus=BulksStatus(0,0)):Future[BulksStatus] = {
         if (iterator.hasNext) {
-          val groupsParallelProcessingFutures = iterator.take(20).map { group =>
+          val groupsParallelProcessingFutures = iterator.take(30).map { group =>
             insertBulk(indexName, group.map(lineToDocument(headers)))
           }
           val groupsParallelProcessingFuture = Future.sequence(groupsParallelProcessingFutures)
@@ -148,7 +136,7 @@ object ChicagoCrimesImport extends ElasticClientHelper {
           }
         } else Future.successful(status)
       }
-      write(linesIterator.grouped(1000)) // TODO - check all results status
+      write(linesIterator.grouped(2000)) // TODO - check all results status
     }
 
     // Slow
@@ -174,17 +162,15 @@ object ChicagoCrimesImport extends ElasticClientHelper {
       cleaned <- doClean(indexName) // delete any existing indexName
       created <- doCreateTestIndex(indexName) // create the indexName, required for geoloc type mapping
       refreshDisabledResponse <- doLoadingOptimizationsStart(indexName) // To accelerate insertion
-      //responses <- writeDataSeq(indexName) // bulk operation insert all events
-      responses <- writeDataPar(indexName) // bulk operation insert all events
+      //response <- writeDataSeq(indexName) // bulk operation insert all events
+      response <- writeDataPar(indexName) // bulk operation insert all events
       refreshEnabledResponse <- doLoadingOptimizationEnd(indexName) // revert back to a normal behavior
       refreshed <- doRefreshIndex(indexName) // to wait for every to be available for search...
       count <- doCount(indexName)
     } yield {
+      println(response) // bulks operation status
       count
     }
-
-
-    Await.result(futureResponse, 30.minutes) // because we don't want to exit the script before the future has completed
 
     futureResponse map { countResponse =>
       val duration = (now() - startedAt) / 1000
@@ -193,6 +179,7 @@ object ChicagoCrimesImport extends ElasticClientHelper {
   }
 
   def main(args: Array[String]): Unit = {
-    fill()
+    val response = fill()
+    //Await.result(futureResponse, 30.minutes) // because we don't want to exit the script before the future has completed
   }
 }
