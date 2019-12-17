@@ -92,12 +92,7 @@ class SerDesTest extends ElasticClientDynamicProvisionedTestsHelper {
     info("Simple way, just one bulk, so just 1 future")
     client.execute {
       bulk {
-        for {
-          _ <- 1 to 10000
-          someone = generateSomeone()
-        } yield {
-          indexInto("serdes").doc(someone)
-        }
+        (1 to 10000).map(_ =>  indexInto("serdes").doc(generateSomeone()))
       }
     }.map{response =>
       response.result.failures.size shouldBe 0
