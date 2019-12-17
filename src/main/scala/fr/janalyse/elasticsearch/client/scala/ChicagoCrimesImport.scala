@@ -24,7 +24,8 @@ object ChicagoCrimesImport {
    new ChicagoCrimesImport(elasticProperties)
 
   def main(args: Array[String]): Unit = {
-    val response = ChicagoCrimesImport().importCSV()
+    val chicagoCrimeOpenDataCsvFile = args.headOption.getOrElse("crimes.csv")
+    val response = ChicagoCrimesImport().importCSV(chicagoCrimeOpenDataCsvFile)
     //Await.result(futureResponse, 30.minutes) // because we don't want to exit the script before the future has completed
   }
 }
@@ -136,12 +137,12 @@ class ChicagoCrimesImport(elasticProperties: ElasticProperties) {
 
   case class BulksStatus(successes:Int, failures:Int)
 
-  def importCSV(limitOption:Option[Int]=None) = {
+  def importCSV(chicagoCrimeOpenDataCsvFile:String="crimes.csv", limitOption:Option[Int]=None) = {
     val linesIterator = limitOption match {
       case None =>
-        scala.io.Source.fromFile("crimes.csv").getLines
+        scala.io.Source.fromFile(chicagoCrimeOpenDataCsvFile).getLines
       case Some(limit) =>
-        scala.io.Source.fromFile("crimes.csv").getLines.take(limit+1) // +1 because of the header line
+        scala.io.Source.fromFile(chicagoCrimeOpenDataCsvFile).getLines.take(limit+1) // +1 because of the header line
     }
     val headers = normalizeHeaders(linesIterator.next.split("""\s*,\s*""").toList)
 

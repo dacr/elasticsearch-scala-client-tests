@@ -13,7 +13,7 @@ class ChicagoCrimesTest extends ElasticClientDynamicProvisionedTestsHelper {
 
   override def beforeAll(): Unit = {
     super.beforeAll
-    val result = ChicagoCrimesImport(elasticProperties).importCSV(Some(10000))
+    val result = ChicagoCrimesImport(elasticProperties).importCSV(limitOption=Some(10000))
     result.await(10.minutes)
   }
   // ----------------------------------------------------------------------
