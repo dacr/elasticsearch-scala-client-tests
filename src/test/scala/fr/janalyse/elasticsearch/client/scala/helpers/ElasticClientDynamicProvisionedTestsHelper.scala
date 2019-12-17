@@ -13,6 +13,9 @@ abstract class ElasticClientDynamicProvisionedTestsHelper extends AsyncFlatSpec 
   implicit val serialization = native.Serialization
   implicit val formats = DefaultFormats.lossless ++ JavaTimeSerializers.all
 
+  val elasticPort = 10201
+  val elasticProperties = ElasticProperties(s"http://127.0.0.1:$elasticPort")
+
   val runner = new ElasticsearchClusterRunner()
   var client: ElasticClient = _
 
@@ -26,14 +29,13 @@ abstract class ElasticClientDynamicProvisionedTestsHelper extends AsyncFlatSpec 
         override def build(number:Int, settingsBuilder:Builder):Unit = {
           settingsBuilder.put("cluster.routing.allocation.disk.threshold_enabled", false)
           settingsBuilder.put("node.name", s"Node#$number")
-          settingsBuilder.put("http.port", 9200+number)
-          settingsBuilder.put("transport.port", "9300-9400")
+          settingsBuilder.put("http.port", 10200+number)
+          settingsBuilder.put("transport.port", "10300-10400")
         }
       }
     ).build(configs)
     runner.ensureYellow()
-    val elasticPort = 9201
-    client = ElasticClient(JavaClient(ElasticProperties(s"http://127.0.0.1:$elasticPort")))
+    client = ElasticClient(JavaClient(elasticProperties))
   }
 
   override def afterAll(): Unit = {

@@ -19,7 +19,9 @@ import scala.util.{Failure, Success}
 
 object ChicagoCrimesImport {
  def apply():ChicagoCrimesImport =
-   new ChicagoCrimesImport(s"http://127.0.0.1:9201")
+   new ChicagoCrimesImport(ElasticProperties(s"http://127.0.0.1:9200"))
+ def apply(elasticProperties: ElasticProperties):ChicagoCrimesImport =
+   new ChicagoCrimesImport(elasticProperties)
 
   def main(args: Array[String]): Unit = {
     val response = ChicagoCrimesImport().importCSV()
@@ -28,7 +30,7 @@ object ChicagoCrimesImport {
 }
 
 
-class ChicagoCrimesImport(elasticPropertiesDesc:String) {
+class ChicagoCrimesImport(elasticProperties: ElasticProperties) {
   val logger = LoggerFactory.getLogger(getClass())
 
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -36,7 +38,7 @@ class ChicagoCrimesImport(elasticPropertiesDesc:String) {
   val indexName = "crimes"
   val mappingName = "testmapping"
 
-  val client = ElasticClient(JavaClient(ElasticProperties(elasticPropertiesDesc)))
+  val client = ElasticClient(JavaClient(elasticProperties))
   implicit val serialization = native.Serialization
   implicit val formats = DefaultFormats.lossless ++ JavaTimeSerializers.all
 
@@ -46,7 +48,7 @@ class ChicagoCrimesImport(elasticPropertiesDesc:String) {
   def doCreateTestIndex(name: String) = client.execute {
     logger.info(s"doCreateTestIndex($name)")
     createIndex(name)
-      .mappings {
+      .mapping {
         properties() as Seq(
           geopointField("location")
         )
