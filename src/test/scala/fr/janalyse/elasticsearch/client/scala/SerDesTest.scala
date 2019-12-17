@@ -75,6 +75,19 @@ class SerDesTest extends ElasticClientDynamicProvisionedTestsHelper {
     }
   }
 
+  it should "be possible to extract only some fields" in {
+    val fields = List("name", "address.country")
+    client.execute {
+      search("serdes").query("joe").sourceInclude(fields)
+    }.map { response =>
+      val people = response.result.safeTo[JValue].collect { case Success(x) => x }
+      people.size shouldBe 1
+      (people.headOption.value \ "name").extract[String] shouldBe "joe"
+      (people.headOption.value \ "address" \ "country" ).extract[String] shouldBe "us"
+      (people.headOption.value \ "gender").extractOpt[String] shouldBe None
+    }
+  }
+
   it should "be possible to write a bulk of documents" in {
     info("Simple way, just one bulk, so just 1 future")
     client.execute {
