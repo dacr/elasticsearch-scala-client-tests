@@ -93,4 +93,5 @@ jrebel.lic
 /.lib/
 
 # my resources
-
+null/
+elastic-data/
